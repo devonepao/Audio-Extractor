@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="light">
+    <meta name="theme-color" content="#f5f5f7">
+    <title>Audio Extractor - YouTube Downloader</title>
+    <meta name="description" content="Extract audio and download videos from YouTube with multiple format and quality options">
+    
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    
+    <!-- Apple Design System Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="safe-area-top"></div>
+    
+    <main class="container">
+        <header class="header">
+            <div class="icon-wrapper">
+                <svg class="app-icon" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="60" height="60" rx="13" fill="url(#gradient)"/>
+                    <path d="M30 15L45 25V35L30 45L15 35V25L30 15Z" fill="white" opacity="0.9"/>
+                    <path d="M30 22V38M24 28L30 25L36 28M24 32L30 35L36 32" stroke="url(#gradient)" stroke-width="2" stroke-linecap="round"/>
+                    <defs>
+                        <linearGradient id="gradient" x1="0" y1="0" x2="60" y2="60">
+                            <stop offset="0%" stop-color="#007AFF"/>
+                            <stop offset="100%" stop-color="#5856D6"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+            <h1 class="title">Audio Extractor</h1>
+            <p class="subtitle">Extract audio and download videos from YouTube</p>
+        </header>
+
+        <section class="card input-section">
+            <div class="form-group">
+                <label for="videoUrl" class="label">YouTube URL</label>
+                <div class="input-wrapper">
+                    <input 
+                        type="text" 
+                        id="videoUrl" 
+                        class="input" 
+                        placeholder="https://www.youtube.com/watch?v=..."
+                        autocomplete="off"
+                    >
+                    <button id="clearBtn" class="clear-btn" aria-label="Clear input">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <circle cx="10" cy="10" r="9" fill="currentColor" opacity="0.3"/>
+                            <path d="M7 7L13 13M13 7L7 13" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <button id="extractBtn" class="btn btn-primary">
+                <span class="btn-text">Extract Media</span>
+                <svg class="btn-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+                    <path d="M10 3V17M10 17L15 12M10 17L5 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </section>
+
+        <section id="loadingSection" class="card loading-section" style="display: none;">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <p class="loading-text">Fetching video information...</p>
+            </div>
+        </section>
+
+        <section id="previewSection" class="card preview-section" style="display: none;">
+            <div class="preview-header">
+                <img id="thumbnail" class="thumbnail" alt="Video thumbnail">
+                <div class="preview-info">
+                    <h3 id="videoTitle" class="video-title"></h3>
+                    <p id="videoAuthor" class="video-author"></p>
+                    <p id="videoDuration" class="video-duration"></p>
+                </div>
+            </div>
+        </section>
+
+        <section id="audioSection" class="card options-section" style="display: none;">
+            <div class="section-header">
+                <svg class="section-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 3V16.5M12 16.5L9 13.5M12 16.5L15 13.5M6 21H18C19.1046 21 20 20.1046 20 19V12C20 10.8954 19.1046 10 18 10H6C4.89543 10 4 10.8954 4 12V19C4 20.1046 4.89543 21 6 21Z"/>
+                </svg>
+                <h2 class="section-title">Audio Downloads</h2>
+            </div>
+            <div id="audioOptions" class="options-grid"></div>
+        </section>
+
+        <section id="videoSection" class="card options-section" style="display: none;">
+            <div class="section-header">
+                <svg class="section-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M15 10L10.5 7.5V12.5L15 10ZM21 5V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V5C3 3.89543 3.89543 3 5 3H19C20.1046 3 21 3.89543 21 5Z"/>
+                </svg>
+                <h2 class="section-title">Video Downloads</h2>
+            </div>
+            <div id="videoOptions" class="options-grid"></div>
+        </section>
+
+        <section id="downloadProgress" class="card progress-section" style="display: none;">
+            <div class="progress-header">
+                <h3 class="progress-title">Downloading...</h3>
+                <span id="progressPercent" class="progress-percent">0%</span>
+            </div>
+            <div class="progress-bar-container">
+                <div id="progressBar" class="progress-bar"></div>
+            </div>
+            <p id="progressStatus" class="progress-status">Preparing download...</p>
+        </section>
+
+        <section id="errorSection" class="card error-section" style="display: none;">
+            <div class="error-content">
+                <svg class="error-icon" width="48" height="48" viewBox="0 0 48 48" fill="none">
+                    <circle cx="24" cy="24" r="20" stroke="#FF3B30" stroke-width="2"/>
+                    <path d="M24 14V26M24 32V34" stroke="#FF3B30" stroke-width="2.5" stroke-linecap="round"/>
+                </svg>
+                <h3 class="error-title">Something went wrong</h3>
+                <p id="errorMessage" class="error-message"></p>
+                <button id="dismissErrorBtn" class="btn btn-secondary">Dismiss</button>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p class="footer-text">Made with care for the Apple ecosystem</p>
+        <p class="footer-note">Note: This tool uses third-party APIs. Please respect copyright and terms of service.</p>
+    </footer>
+
+    <div class="safe-area-bottom"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
