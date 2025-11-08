@@ -285,6 +285,38 @@ function renderVideoOptions(videoFormats) {
     });
 }
 
+function triggerFileDownload(blob, filename) {
+    // Create a download link and trigger it
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    
+    // Cleanup
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 100);
+}
+
+function createDemoFile(type, quality) {
+    // Create a small demo file with metadata
+    const metadata = `Audio Extractor Demo File
+Type: ${type}
+Quality: ${quality}
+Video: ${currentVideoData.title}
+Author: ${currentVideoData.author}
+Generated: ${new Date().toISOString()}
+
+This is a demonstration file. In a production environment, 
+this would be the actual audio/video content from YouTube.`;
+    
+    const blob = new Blob([metadata], { type: type === 'audio' ? 'audio/mpeg' : 'video/mp4' });
+    return blob;
+}
+
 async function handleDownload(type, quality, extra) {
     // Show progress section
     hideSection(elements.audioSection);
@@ -293,22 +325,25 @@ async function handleDownload(type, quality, extra) {
     updateProgress(0, 'Preparing download...');
     
     try {
-        // Simulate download
+        // Simulate download progress
         await mockDownload(type, quality);
         
-        // Create mock download - escape user input
+        // Create filename - escape user input
         const safeTitle = currentVideoData.title.substring(0, 50).replace(/[<>:"/\\|?*]/g, '_');
         const safeQuality = quality.replace(/[<>:"/\\|?*]/g, '_');
         const filename = type === 'audio' 
             ? `${safeTitle}_${safeQuality}.mp3`
             : `${safeTitle}_${safeQuality}.mp4`;
         
-        // In a real implementation, this would trigger actual download
+        // Create and trigger actual file download
+        const fileBlob = createDemoFile(type, quality);
+        triggerFileDownload(fileBlob, filename);
+        
         updateProgress(100, 'Download complete!');
         
         // Show success message
         setTimeout(() => {
-            alert(`Download started: ${filename}\n\nNote: This is a demo. In production, the actual file would be downloaded.`);
+            alert(`File downloaded: ${filename}\n\nNote: This is a demo file. In production, the actual media content would be downloaded.`);
             
             // Hide progress and show options again
             hideSection(elements.downloadProgress);
