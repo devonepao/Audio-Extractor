@@ -73,6 +73,12 @@ function formatFileSize(bytes) {
     return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${units[i]}`;
 }
 
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 function showSection(section) {
     section.style.display = 'block';
     section.style.animation = 'fadeInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
@@ -189,8 +195,13 @@ elements.extractBtn.addEventListener('click', async () => {
         const videoInfo = await mockFetchVideoInfo(videoId);
         currentVideoData = videoInfo;
         
-        // Update preview
-        elements.thumbnail.src = videoInfo.thumbnail;
+        // Update preview - validate and sanitize URLs
+        if (videoInfo.thumbnail && videoInfo.thumbnail.startsWith('https://')) {
+            elements.thumbnail.src = videoInfo.thumbnail;
+        } else {
+            // Use placeholder if thumbnail URL is invalid
+            elements.thumbnail.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjkwIiB2aWV3Qm94PSIwIDAgMTIwIDkwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxMjAiIGhlaWdodD0iOTAiIGZpbGw9IiNmNWY1ZjciLz48L3N2Zz4=';
+        }
         elements.videoTitle.textContent = videoInfo.title;
         elements.videoAuthor.textContent = videoInfo.author;
         elements.videoDuration.textContent = `Duration: ${formatDuration(videoInfo.duration)}`;
@@ -217,37 +228,61 @@ elements.extractBtn.addEventListener('click', async () => {
 });
 
 function renderAudioOptions(audioFormats) {
-    elements.audioOptions.innerHTML = audioFormats.map((format, index) => `
-        <div class="option-item" data-type="audio" data-quality="${format.quality}">
+    elements.audioOptions.innerHTML = audioFormats.map((format, index) => {
+        const quality = escapeHtml(format.quality);
+        const bitrate = escapeHtml(String(format.bitrate));
+        const size = escapeHtml(format.size);
+        return `
+        <div class="option-item" data-type="audio" data-quality="${quality}">
             <div class="option-info">
-                <div class="option-title">MP3 - ${format.quality}</div>
-                <div class="option-details">Bitrate: ${format.bitrate} kbps • Size: ~${format.size}</div>
+                <div class="option-title">MP3 - ${quality}</div>
+                <div class="option-details">Bitrate: ${bitrate} kbps • Size: ~${size}</div>
             </div>
-            <button class="option-action" onclick="handleDownload('audio', '${format.quality}', ${format.bitrate})">
+            <button class="option-action" data-type="audio" data-quality="${quality}" data-bitrate="${bitrate}">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M8 2v8m0 0L5 7m3 3l3-3M3 14h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                 </svg>
                 Download
             </button>
         </div>
-    `).join('');
+    `;
+    }).join('');
+    
+    // Add event listeners
+    elements.audioOptions.querySelectorAll('.option-action').forEach(btn => {
+        btn.addEventListener('click', () => {
+            handleDownload(btn.dataset.type, btn.dataset.quality, btn.dataset.bitrate);
+        });
+    });
 }
 
 function renderVideoOptions(videoFormats) {
-    elements.videoOptions.innerHTML = videoFormats.map((format, index) => `
-        <div class="option-item" data-type="video" data-quality="${format.quality}">
+    elements.videoOptions.innerHTML = videoFormats.map((format, index) => {
+        const quality = escapeHtml(format.quality);
+        const resolution = escapeHtml(format.resolution);
+        const size = escapeHtml(format.size);
+        return `
+        <div class="option-item" data-type="video" data-quality="${quality}">
             <div class="option-info">
-                <div class="option-title">MP4 - ${format.quality}</div>
-                <div class="option-details">Resolution: ${format.resolution} • Size: ~${format.size}</div>
+                <div class="option-title">MP4 - ${quality}</div>
+                <div class="option-details">Resolution: ${resolution} • Size: ~${size}</div>
             </div>
-            <button class="option-action" onclick="handleDownload('video', '${format.quality}', '${format.resolution}')">
+            <button class="option-action" data-type="video" data-quality="${quality}" data-resolution="${resolution}">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M8 2v8m0 0L5 7m3 3l3-3M3 14h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                 </svg>
                 Download
             </button>
         </div>
-    `).join('');
+    `;
+    }).join('');
+    
+    // Add event listeners
+    elements.videoOptions.querySelectorAll('.option-action').forEach(btn => {
+        btn.addEventListener('click', () => {
+            handleDownload(btn.dataset.type, btn.dataset.quality, btn.dataset.resolution);
+        });
+    });
 }
 
 async function handleDownload(type, quality, extra) {
@@ -261,10 +296,12 @@ async function handleDownload(type, quality, extra) {
         // Simulate download
         await mockDownload(type, quality);
         
-        // Create mock download
+        // Create mock download - escape user input
+        const safeTitle = currentVideoData.title.substring(0, 50).replace(/[<>:"/\\|?*]/g, '_');
+        const safeQuality = quality.replace(/[<>:"/\\|?*]/g, '_');
         const filename = type === 'audio' 
-            ? `${currentVideoData.title.substring(0, 50)}_${quality}.mp3`
-            : `${currentVideoData.title.substring(0, 50)}_${quality}.mp4`;
+            ? `${safeTitle}_${safeQuality}.mp3`
+            : `${safeTitle}_${safeQuality}.mp4`;
         
         // In a real implementation, this would trigger actual download
         updateProgress(100, 'Download complete!');
@@ -285,9 +322,6 @@ async function handleDownload(type, quality, extra) {
         hideSection(elements.downloadProgress);
     }
 }
-
-// Make handleDownload globally accessible
-window.handleDownload = handleDownload;
 
 // Input validation and UX improvements
 elements.videoUrl.addEventListener('input', (e) => {
