@@ -38,8 +38,7 @@ const elements = {
 let currentVideoData = null;
 
 // API Configuration
-const API_BASE = 'https://youtube-mp36.p.rapidapi.com';
-const YTDL_API = 'https://ytstream-download-youtube-videos.p.rapidapi.com';
+const INVIDIOUS_INSTANCE = 'https://yewtu.be';
 
 // Utility Functions
 function extractVideoId(url) {
@@ -98,56 +97,12 @@ function hideError() {
     hideSection(elements.errorSection);
 }
 
-// Mock API for demonstration (since we can't use real API keys in a public repo)
-async function mockFetchVideoInfo(videoId) {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Return mock data
-    return {
-        title: 'Sample Video Title - Audio Extraction Demo',
-        author: 'Demo Channel',
-        duration: 245, // 4:05
-        thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-        videoId: videoId
-    };
-}
-
-async function mockGetDownloadOptions(videoId) {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    return {
-        audio: [
-            { quality: '320 kbps', format: 'mp3', size: '7.8 MB', bitrate: 320 },
-            { quality: '256 kbps', format: 'mp3', size: '6.2 MB', bitrate: 256 },
-            { quality: '192 kbps', format: 'mp3', size: '4.7 MB', bitrate: 192 },
-            { quality: '128 kbps', format: 'mp3', size: '3.1 MB', bitrate: 128 },
-            { quality: '64 kbps', format: 'mp3', size: '1.6 MB', bitrate: 64 }
-        ],
-        video: [
-            { quality: '1080p', format: 'mp4', size: '125 MB', resolution: '1920x1080' },
-            { quality: '720p', format: 'mp4', size: '78 MB', resolution: '1280x720' },
-            { quality: '480p', format: 'mp4', size: '45 MB', resolution: '854x480' },
-            { quality: '360p', format: 'mp4', size: '28 MB', resolution: '640x360' },
-            { quality: '240p', format: 'mp4', size: '15 MB', resolution: '426x240' }
-        ]
-    };
-}
-
-async function mockDownload(type, quality) {
-    // Simulate download progress
-    return new Promise((resolve) => {
-        let progress = 0;
-        const interval = setInterval(() => {
-            progress += Math.random() * 15;
-            if (progress >= 100) {
-                progress = 100;
-                clearInterval(interval);
-                setTimeout(() => resolve({ success: true }), 500);
-            }
-            updateProgress(progress, `Downloading ${type} (${quality})...`);
-        }, 300);
-    });
+async function fetchVideoInfo(videoId) {
+    const response = await fetch(`${INVIDIOUS_INSTANCE}/api/v1/videos/${videoId}`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch video information: ${response.statusText}`);
+    }
+    return response.json();
 }
 
 function updateProgress(percent, status) {
@@ -192,28 +147,29 @@ elements.extractBtn.addEventListener('click', async () => {
     
     try {
         // Fetch video info
-        const videoInfo = await mockFetchVideoInfo(videoId);
+        const videoInfo = await fetchVideoInfo(videoId);
         currentVideoData = videoInfo;
         
-        // Update preview - validate and sanitize URLs
-        if (videoInfo.thumbnail && videoInfo.thumbnail.startsWith('https://')) {
-            elements.thumbnail.src = videoInfo.thumbnail;
+        // Update preview
+        const thumbnailUrl = videoInfo.videoThumbnails.find(t => t.quality === 'hqdefault')?.url;
+        if (thumbnailUrl) {
+            elements.thumbnail.src = thumbnailUrl;
         } else {
-            // Use placeholder if thumbnail URL is invalid
             elements.thumbnail.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjkwIiB2aWV3Qm94PSIwIDAgMTIwIDkwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxMjAiIGhlaWdodD0iOTAiIGZpbGw9IiNmNWY1ZjciLz48L3N2Zz4=';
         }
         elements.videoTitle.textContent = videoInfo.title;
         elements.videoAuthor.textContent = videoInfo.author;
-        elements.videoDuration.textContent = `Duration: ${formatDuration(videoInfo.duration)}`;
+        elements.videoDuration.textContent = `Duration: ${formatDuration(videoInfo.lengthSeconds)}`;
         
         // Get download options
-        const options = await mockGetDownloadOptions(videoId);
-        
+        const audioFormats = videoInfo.adaptiveFormats.filter(f => f.type.startsWith('audio/'));
+        const videoFormats = videoInfo.adaptiveFormats.filter(f => f.type.startsWith('video/'));
+
         // Render audio options
-        renderAudioOptions(options.audio);
+        renderAudioOptions(audioFormats);
         
         // Render video options
-        renderVideoOptions(options.video);
+        renderVideoOptions(videoFormats);
         
         // Hide loading and show results
         hideSection(elements.loadingSection);
@@ -228,17 +184,17 @@ elements.extractBtn.addEventListener('click', async () => {
 });
 
 function renderAudioOptions(audioFormats) {
-    elements.audioOptions.innerHTML = audioFormats.map((format, index) => {
-        const quality = escapeHtml(format.quality);
-        const bitrate = escapeHtml(String(format.bitrate));
-        const size = escapeHtml(format.size);
+    elements.audioOptions.innerHTML = audioFormats.map(format => {
+        const quality = `${Math.round(format.bitrate / 1000)} kbps`;
+        const size = format.contentLength ? formatFileSize(format.contentLength) : 'Unknown size';
+        const url = format.url;
         return `
         <div class="option-item" data-type="audio" data-quality="${quality}">
             <div class="option-info">
                 <div class="option-title">MP3 - ${quality}</div>
-                <div class="option-details">Bitrate: ${bitrate} kbps • Size: ~${size}</div>
+                <div class="option-details">Bitrate: ${quality} • Size: ~${size}</div>
             </div>
-            <button class="option-action" data-type="audio" data-quality="${quality}" data-bitrate="${bitrate}">
+            <button class="option-action" data-type="audio" data-quality="${quality}" data-url="${url}">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M8 2v8m0 0L5 7m3 3l3-3M3 14h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                 </svg>
@@ -251,23 +207,23 @@ function renderAudioOptions(audioFormats) {
     // Add event listeners
     elements.audioOptions.querySelectorAll('.option-action').forEach(btn => {
         btn.addEventListener('click', () => {
-            handleDownload(btn.dataset.type, btn.dataset.quality, btn.dataset.bitrate);
+            handleDownload('audio', btn.dataset.quality, btn.dataset.url);
         });
     });
 }
 
 function renderVideoOptions(videoFormats) {
-    elements.videoOptions.innerHTML = videoFormats.map((format, index) => {
-        const quality = escapeHtml(format.quality);
-        const resolution = escapeHtml(format.resolution);
-        const size = escapeHtml(format.size);
+    elements.videoOptions.innerHTML = videoFormats.map(format => {
+        const quality = format.resolution;
+        const size = format.contentLength ? formatFileSize(format.contentLength) : 'Unknown size';
+        const url = format.url;
         return `
         <div class="option-item" data-type="video" data-quality="${quality}">
             <div class="option-info">
                 <div class="option-title">MP4 - ${quality}</div>
-                <div class="option-details">Resolution: ${resolution} • Size: ~${size}</div>
+                <div class="option-details">Resolution: ${quality} • Size: ~${size}</div>
             </div>
-            <button class="option-action" data-type="video" data-quality="${quality}" data-resolution="${resolution}">
+            <button class="option-action" data-type="video" data-quality="${quality}" data-url="${url}">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M8 2v8m0 0L5 7m3 3l3-3M3 14h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                 </svg>
@@ -280,7 +236,7 @@ function renderVideoOptions(videoFormats) {
     // Add event listeners
     elements.videoOptions.querySelectorAll('.option-action').forEach(btn => {
         btn.addEventListener('click', () => {
-            handleDownload(btn.dataset.type, btn.dataset.quality, btn.dataset.resolution);
+            handleDownload('video', btn.dataset.quality, btn.dataset.url);
         });
     });
 }
@@ -301,55 +257,62 @@ function triggerFileDownload(blob, filename) {
     }, 100);
 }
 
-function createDemoFile(type, quality) {
-    // Create a small demo file with metadata
-    const metadata = `Audio Extractor Demo File
-Type: ${type}
-Quality: ${quality}
-Video: ${currentVideoData.title}
-Author: ${currentVideoData.author}
-Generated: ${new Date().toISOString()}
-
-This is a demonstration file. In a production environment, 
-this would be the actual audio/video content from YouTube.`;
-    
-    const blob = new Blob([metadata], { type: type === 'audio' ? 'audio/mpeg' : 'video/mp4' });
-    return blob;
-}
-
-async function handleDownload(type, quality, extra) {
+async function handleDownload(type, quality, url) {
     // Show progress section
     hideSection(elements.audioSection);
     hideSection(elements.videoSection);
     showSection(elements.downloadProgress);
     updateProgress(0, 'Preparing download...');
-    
+
     try {
-        // Simulate download progress
-        await mockDownload(type, quality);
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Download failed: ${response.statusText}`);
+        }
+
+        const contentLength = response.headers.get('content-length');
+        const totalSize = parseInt(contentLength, 10);
+        let loadedSize = 0;
+
+        const reader = response.body.getReader();
+        const stream = new ReadableStream({
+            start(controller) {
+                function push() {
+                    reader.read().then(({ done, value }) => {
+                        if (done) {
+                            controller.close();
+                            return;
+                        }
+                        loadedSize += value.length;
+                        if (totalSize) {
+                            const percent = (loadedSize / totalSize) * 100;
+                            updateProgress(percent, `Downloading ${type} (${quality})...`);
+                        }
+                        controller.enqueue(value);
+                        push();
+                    });
+                }
+                push();
+            }
+        });
+
+        const blob = await new Response(stream).blob();
         
-        // Create filename - escape user input
+        // Create filename
         const safeTitle = currentVideoData.title.substring(0, 50).replace(/[<>:"/\\|?*]/g, '_');
         const safeQuality = quality.replace(/[<>:"/\\|?*]/g, '_');
-        const filename = type === 'audio' 
-            ? `${safeTitle}_${safeQuality}.mp3`
-            : `${safeTitle}_${safeQuality}.mp4`;
+        const extension = type === 'audio' ? 'mp3' : 'mp4';
+        const filename = `${safeTitle}_${safeQuality}.${extension}`;
         
-        // Create and trigger actual file download
-        const fileBlob = createDemoFile(type, quality);
-        triggerFileDownload(fileBlob, filename);
+        triggerFileDownload(blob, filename);
         
         updateProgress(100, 'Download complete!');
         
-        // Show success message
         setTimeout(() => {
-            alert(`File downloaded: ${filename}\n\nNote: This is a demo file. In production, the actual media content would be downloaded.`);
-            
-            // Hide progress and show options again
             hideSection(elements.downloadProgress);
             showSection(elements.audioSection);
             showSection(elements.videoSection);
-        }, 1000);
+        }, 2000);
         
     } catch (error) {
         console.error('Download error:', error);
@@ -388,8 +351,3 @@ window.addEventListener('appinstalled', () => {
     console.log('PWA installed successfully');
     deferredPrompt = null;
 });
-
-// Demo mode indicator
-console.log('%c🎵 Audio Extractor Demo Mode', 'font-size: 16px; color: #007AFF; font-weight: bold;');
-console.log('%cThis is a demonstration version using mock data.', 'font-size: 12px; color: #666;');
-console.log('%cFor production use, integrate with a real YouTube API service.', 'font-size: 12px; color: #666;');
