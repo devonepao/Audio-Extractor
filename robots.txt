@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://devonepao.github.io/Audio-Extractor/sitemap.xml

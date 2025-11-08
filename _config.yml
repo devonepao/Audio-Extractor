@@ -1,0 +1,12 @@
+# GitHub Pages Configuration
+# This file ensures proper deployment settings for GitHub Pages
+
+# Build settings
+theme: null
+plugins: []
+
+# File exclusions
+exclude:
+  - .gitignore
+  - README.md
+  - icon.svg
